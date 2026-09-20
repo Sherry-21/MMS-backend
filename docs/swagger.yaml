@@ -1,0 +1,604 @@
+basePath: /
+definitions:
+  payloads.BaseResponse:
+    properties:
+      data: {}
+      error: {}
+      message:
+        type: string
+      success:
+        type: boolean
+      timestamp:
+        type: string
+    type: object
+  payloads.CategoryResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      slug:
+        type: string
+    type: object
+  payloads.CreateCategoryRequest:
+    properties:
+      name:
+        example: Electronics
+        type: string
+      slug:
+        example: electronics
+        type: string
+    type: object
+  payloads.CreateImportBatchItemRequest:
+    properties:
+      product_variant_id:
+        example: 1
+        type: integer
+      quantity_received:
+        example: 100
+        type: integer
+      unit_cost_original_currency:
+        example: 12.5
+        type: number
+    type: object
+  payloads.CreateImportBatchRequest:
+    properties:
+      batch_number:
+        example: IMP-2026-09-001
+        type: string
+      currency_code:
+        example: USD
+        type: string
+      exchange_rate:
+        example: 15850.5
+        type: number
+      import_date:
+        example: "2026-09-20T00:00:00Z"
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/payloads.CreateImportBatchItemRequest'
+        type: array
+      supplier_name:
+        example: Shenzhen Global Tech Ltd
+        type: string
+    type: object
+  payloads.CreateProductRequest:
+    properties:
+      category_id:
+        example: 1
+        type: integer
+      description:
+        example: Latest Apple smartphone
+        type: string
+      name:
+        example: iPhone 15
+        type: string
+      variants:
+        items:
+          $ref: '#/definitions/payloads.CreateProductVariantRequest'
+        type: array
+    type: object
+  payloads.CreateProductVariantRequest:
+    properties:
+      default_selling_price:
+        example: 14999000
+        type: number
+      sku:
+        example: IPHONE15-BLK-128
+        type: string
+      variant_name:
+        example: Black 128GB
+        type: string
+    type: object
+  payloads.ImportBatchItemResponse:
+    properties:
+      id:
+        type: integer
+      product_variant_id:
+        type: integer
+      quantity_received:
+        type: integer
+      unit_cost_idr:
+        type: number
+      unit_cost_original_currency:
+        type: number
+    type: object
+  payloads.ImportBatchResponse:
+    properties:
+      batch_number:
+        type: string
+      created_at:
+        type: string
+      currency_code:
+        type: string
+      exchange_rate:
+        type: number
+      id:
+        type: integer
+      import_date:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/payloads.ImportBatchItemResponse'
+        type: array
+      supplier_name:
+        type: string
+      total_import_cost:
+        type: number
+    type: object
+  payloads.LoginRequest:
+    properties:
+      password:
+        example: SuperSecurePass123!
+        type: string
+      username:
+        example: john_doe
+        type: string
+    type: object
+  payloads.LoginResponse:
+    properties:
+      message:
+        type: string
+      user:
+        $ref: '#/definitions/payloads.UserResponse'
+    type: object
+  payloads.ProductResponse:
+    properties:
+      category:
+        $ref: '#/definitions/payloads.CategoryResponse'
+      category_id:
+        type: integer
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      variants:
+        items:
+          $ref: '#/definitions/payloads.ProductVariantResponse'
+        type: array
+    type: object
+  payloads.ProductVariantListItemResponse:
+    properties:
+      category_name:
+        type: string
+      created_at:
+        type: string
+      default_selling_price:
+        type: number
+      id:
+        type: integer
+      product_id:
+        type: integer
+      product_name:
+        type: string
+      sku:
+        type: string
+      variant_name:
+        type: string
+    type: object
+  payloads.ProductVariantResponse:
+    properties:
+      created_at:
+        type: string
+      default_selling_price:
+        type: number
+      id:
+        type: integer
+      product_id:
+        type: integer
+      sku:
+        type: string
+      variant_name:
+        type: string
+    type: object
+  payloads.RegisterRequest:
+    properties:
+      password:
+        example: SuperSecurePass123!
+        type: string
+      username:
+        example: john_doe
+        type: string
+    type: object
+  payloads.UserResponse:
+    properties:
+      created_at:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+      username:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@maiora.com
+    name: Maiora Support Team
+  description: Robust backend API service for Maiora System built with Go and Chi
+    router.
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: Maiora System Backend API
+  version: "1.0"
+paths:
+  /api/v1/auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates user with username and password
+      parameters:
+      - description: User Login Credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/payloads.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Login successful
+          schema:
+            allOf:
+            - $ref: '#/definitions/payloads.BaseResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/payloads.LoginResponse'
+              type: object
+        "400":
+          description: Invalid request payload
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "401":
+          description: Invalid username or password
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+      summary: User login
+      tags:
+      - Authentication
+  /api/v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Registers a new user account with a unique username and securely
+        hashed password
+      parameters:
+      - description: User Registration Details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/payloads.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: User created successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/payloads.BaseResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/payloads.UserResponse'
+              type: object
+        "400":
+          description: Invalid request input or validation error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "409":
+          description: Username is already taken
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+      summary: Register a new user
+      tags:
+      - Authentication
+  /api/v1/categories:
+    get:
+      description: Retrieves all product categories ordered alphabetically
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Categories retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/payloads.BaseResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/payloads.CategoryResponse'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+      summary: List all product categories
+      tags:
+      - Categories
+    post:
+      consumes:
+      - application/json
+      description: Creates a new product category with automated or custom slug
+      parameters:
+      - description: Category Creation Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/payloads.CreateCategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Category created successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/payloads.BaseResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/payloads.CategoryResponse'
+              type: object
+        "400":
+          description: Validation error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "409":
+          description: Slug already exists
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+      summary: Create a product category
+      tags:
+      - Categories
+  /api/v1/import-batches:
+    post:
+      consumes:
+      - application/json
+      description: Creates an import batch, line items, and auto-populates inventory
+        batches in a single transaction
+      parameters:
+      - description: Import Batch Registration Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/payloads.CreateImportBatchRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Import batch registered successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/payloads.BaseResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/payloads.ImportBatchResponse'
+              type: object
+        "400":
+          description: Invalid request payload or validation error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+      summary: Register a new import batch
+      tags:
+      - Import Batches
+  /api/v1/product-variants:
+    get:
+      description: Retrieves list of all variants/SKUs (ideal for Import Batch search/dropdowns)
+      parameters:
+      - description: Search SKU or variant name
+        in: query
+        name: search
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Variants retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/payloads.BaseResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/payloads.ProductVariantListItemResponse'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+      summary: List product variants (SKUs)
+      tags:
+      - Products
+  /api/v1/products:
+    get:
+      description: Retrieves paginated list of products with optional search and category
+        filter
+      parameters:
+      - description: Search name or description
+        in: query
+        name: search
+        type: string
+      - description: Filter by category ID
+        in: query
+        name: category_id
+        type: integer
+      - description: 'Page number (default: 1)'
+        in: query
+        name: page
+        type: integer
+      - description: 'Page size limit (default: 20)'
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Products retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/payloads.BaseResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/payloads.ProductResponse'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+      summary: List products
+      tags:
+      - Products
+    post:
+      consumes:
+      - application/json
+      description: Creates a new product catalog item with optional inline variants
+      parameters:
+      - description: Product Creation Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/payloads.CreateProductRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Product created successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/payloads.BaseResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/payloads.ProductResponse'
+              type: object
+        "400":
+          description: Validation error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "404":
+          description: Category not found
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+      summary: Create a product
+      tags:
+      - Products
+  /api/v1/products/{id}:
+    get:
+      description: Retrieves full product details including category and variants
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Product retrieved successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/payloads.BaseResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/payloads.ProductResponse'
+              type: object
+        "404":
+          description: Product not found
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+      summary: Get product by ID
+      tags:
+      - Products
+  /api/v1/products/{id}/variants:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new SKU variant for an existing product
+      parameters:
+      - description: Product ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Product Variant Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/payloads.CreateProductVariantRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Variant created successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/payloads.BaseResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/payloads.ProductVariantResponse'
+              type: object
+        "400":
+          description: Validation error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "404":
+          description: Product not found
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "409":
+          description: SKU already exists
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+      summary: Add a variant to a product
+      tags:
+      - Products
+schemes:
+- http
+- https
+swagger: "2.0"
