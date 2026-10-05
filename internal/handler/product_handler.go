@@ -49,8 +49,7 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, service.ErrProductNameRequired),
 			errors.Is(err, service.ErrCategoryIDRequired),
 			errors.Is(err, service.ErrSKURequired),
-			errors.Is(err, service.ErrVariantNameRequired),
-			errors.Is(err, service.ErrSellingPriceNegative):
+			errors.Is(err, service.ErrVariantNameRequired):
 			utils.WriteBadRequest(w, err.Error(), nil)
 		case errors.Is(err, repository.ErrCategoryNotFound):
 			utils.WriteNotFound(w, "Category not found", nil)
@@ -103,7 +102,7 @@ func (h *ProductHandler) GetProductByID(w http.ResponseWriter, r *http.Request) 
 // @Param category_id query int false "Filter by category ID"
 // @Param page query int false "Page number (default: 1)"
 // @Param limit query int false "Page size limit (default: 20)"
-// @Success 200 {object} payloads.BaseResponse{data=[]payloads.ProductResponse} "Products retrieved successfully"
+// @Success 200 {object} payloads.BaseResponse{data=[]payloads.ProductResponse,meta=payloads.PaginationMeta} "Products retrieved successfully"
 // @Failure 500 {object} payloads.BaseResponse "Internal Server Error"
 // @Router /api/v1/products [get]
 func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
@@ -111,6 +110,12 @@ func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 	categoryID, _ := strconv.ParseInt(r.URL.Query().Get("category_id"), 10, 64)
 	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
 	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	if page < 1 {
+		page = 1
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
 
 	products, total, err := h.service.ListProducts(r.Context(), search, categoryID, page, limit)
 	if err != nil {
@@ -118,14 +123,8 @@ func (h *ProductHandler) ListProducts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.WriteSuccess(w, http.StatusOK, "Products retrieved successfully", map[string]interface{}{
-		"items": products,
-		"meta": map[string]interface{}{
-			"total": total,
-			"page":  page,
-			"limit": limit,
-		},
-	})
+	meta := payloads.NewPaginationMeta(page, limit, total)
+	utils.WritePaginatedSuccess(w, http.StatusOK, "Products retrieved successfully", meta, products)
 }
 
 // CreateVariant godoc
@@ -164,8 +163,7 @@ func (h *ProductHandler) CreateVariant(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, repository.ErrSKUAlreadyExists):
 			utils.WriteError(w, http.StatusConflict, err.Error(), nil)
 		case errors.Is(err, service.ErrSKURequired),
-			errors.Is(err, service.ErrVariantNameRequired),
-			errors.Is(err, service.ErrSellingPriceNegative):
+			errors.Is(err, service.ErrVariantNameRequired):
 			utils.WriteBadRequest(w, err.Error(), nil)
 		default:
 			utils.WriteInternalServerError(w, "Failed to create variant", err.Error())

@@ -17,27 +17,52 @@ import (
 
 // Common authentication errors
 var (
-	ErrInvalidCredentials = errors.New("invalid username or password")
-	ErrUsernameRequired   = errors.New("username is required")
-	ErrPasswordTooShort   = errors.New("password must be at least 6 characters")
-	ErrUsernameTaken      = errors.New("username is already registered")
+	ErrInvalidCredentials  = errors.New("invalid username or password")
+	ErrUsernameRequired    = errors.New("username is required")
+	ErrPasswordTooShort    = errors.New("password must be at least 6 characters")
+	ErrUsernameTaken       = errors.New("username is already registered")
+	ErrInvalidRefreshToken = errors.New("invalid or expired refresh token")
+	ErrRefreshTokenRequired = errors.New("refresh token is required")
 )
 
 // AuthService defines the business logic interface for authentication
 type AuthService interface {
 	Register(ctx context.Context, req *payloads.RegisterRequest) (*payloads.UserResponse, error)
 	Login(ctx context.Context, req *payloads.LoginRequest) (*payloads.LoginResponse, error)
+	RefreshToken(ctx context.Context, req *payloads.RefreshTokenRequest) (*payloads.TokenResponse, error)
 }
 
 // authService is the concrete implementation of AuthService
 type authService struct {
-	userRepo repository.UserRepository
+	userRepo      repository.UserRepository
+	tokenRepo     repository.RefreshTokenRepository
+	jwtSecret     string
+	accessExpiry  time.Duration
+	refreshExpiry time.Duration
 }
 
 // NewAuthService creates a new AuthService instance
-func NewAuthService(userRepo repository.UserRepository) AuthService {
+func NewAuthService(
+	userRepo repository.UserRepository,
+	tokenRepo repository.RefreshTokenRepository,
+	jwtSecret string,
+	accessExpiry, refreshExpiry time.Duration,
+) AuthService {
+	if jwtSecret == "" {
+		jwtSecret = "maiora-default-secret-key-change-in-production"
+	}
+	if accessExpiry <= 0 {
+		accessExpiry = 15 * time.Minute
+	}
+	if refreshExpiry <= 0 {
+		refreshExpiry = 7 * 24 * time.Hour
+	}
 	return &authService{
-		userRepo: userRepo,
+		userRepo:      userRepo,
+		tokenRepo:     tokenRepo,
+		jwtSecret:     jwtSecret,
+		accessExpiry:  accessExpiry,
+		refreshExpiry: refreshExpiry,
 	}
 }
 
@@ -107,9 +132,104 @@ func (s *authService) Login(ctx context.Context, req *payloads.LoginRequest) (*p
 		return nil, ErrInvalidCredentials
 	}
 
-	// 3. Return safe LoginResponse
+	// 3. Generate access and refresh token pair
+	tokens, err := utils.GenerateTokenPair(user.ID, user.Username, s.jwtSecret, s.accessExpiry, s.refreshExpiry)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate token pair: %w", err)
+	}
+
+	// 4. Save refresh token in dedicated refresh_tokens table (we do NOT store access token)
+	if s.tokenRepo != nil {
+		refreshTokenRecord := &model.RefreshToken{
+			UserID:       user.ID,
+			RefreshToken: tokens.RefreshToken,
+			ExpiresAt:    time.Now().UTC().Add(s.refreshExpiry),
+			IsRevoked:    false,
+		}
+		if err := s.tokenRepo.Create(ctx, refreshTokenRecord); err != nil {
+			return nil, fmt.Errorf("failed to persist refresh token: %w", err)
+		}
+	}
+
+	// 5. Return safe LoginResponse with access and refresh tokens
 	return &payloads.LoginResponse{
-		User:    user.ToUserResponse(),
-		Message: "Authentication successful",
+		User:         user.ToUserResponse(),
+		Token:        tokens.AccessToken,
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+		TokenType:    tokens.TokenType,
+		ExpiresIn:    tokens.ExpiresIn,
+		Message:      "Authentication successful",
+	}, nil
+}
+
+// RefreshToken validates an existing refresh token against the refresh_tokens table, rotates tokens, and returns a new token pair
+func (s *authService) RefreshToken(ctx context.Context, req *payloads.RefreshTokenRequest) (*payloads.TokenResponse, error) {
+	if req == nil || strings.TrimSpace(req.RefreshToken) == "" {
+		return nil, ErrRefreshTokenRequired
+	}
+
+	refreshTokenStr := strings.TrimSpace(req.RefreshToken)
+
+	// 1. Verify token signature, structure, and expiration
+	claims, err := utils.ValidateJWT(refreshTokenStr, s.jwtSecret)
+	if err != nil {
+		return nil, ErrInvalidRefreshToken
+	}
+
+	// 2. Enforce that the token type is strictly 'refresh'
+	if claims.TokenType != utils.TokenTypeRefresh {
+		return nil, ErrInvalidRefreshToken
+	}
+
+	// 3. Fetch user by claims UserID
+	user, err := s.userRepo.FindByID(ctx, claims.UserID)
+	if err != nil {
+		if errors.Is(err, repository.ErrUserNotFound) {
+			return nil, ErrInvalidRefreshToken
+		}
+		return nil, fmt.Errorf("failed to retrieve user for token refresh: %w", err)
+	}
+
+	// 4. Check refresh token in refresh_tokens table (must exist, !is_revoked, expires_at > now)
+	if s.tokenRepo != nil {
+		tokenRecord, err := s.tokenRepo.FindByToken(ctx, refreshTokenStr)
+		if err != nil || tokenRecord == nil || tokenRecord.IsRevoked || tokenRecord.ExpiresAt.Before(time.Now().UTC()) {
+			return nil, ErrInvalidRefreshToken
+		}
+		if tokenRecord.UserID != user.ID {
+			return nil, ErrInvalidRefreshToken
+		}
+
+		// 5. Revoke the old refresh token (Refresh Token Rotation)
+		if err := s.tokenRepo.RevokeToken(ctx, refreshTokenStr); err != nil {
+			return nil, fmt.Errorf("failed to revoke old refresh token: %w", err)
+		}
+	}
+
+	// 6. Generate a brand new token pair (Refresh Token Rotation)
+	tokens, err := utils.GenerateTokenPair(user.ID, user.Username, s.jwtSecret, s.accessExpiry, s.refreshExpiry)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate new token pair: %w", err)
+	}
+
+	// 7. Store the new refresh token in refresh_tokens table
+	if s.tokenRepo != nil {
+		newRecord := &model.RefreshToken{
+			UserID:       user.ID,
+			RefreshToken: tokens.RefreshToken,
+			ExpiresAt:    time.Now().UTC().Add(s.refreshExpiry),
+			IsRevoked:    false,
+		}
+		if err := s.tokenRepo.Create(ctx, newRecord); err != nil {
+			return nil, fmt.Errorf("failed to persist new refresh token: %w", err)
+		}
+	}
+
+	return &payloads.TokenResponse{
+		AccessToken:  tokens.AccessToken,
+		RefreshToken: tokens.RefreshToken,
+		TokenType:    tokens.TokenType,
+		ExpiresIn:    tokens.ExpiresIn,
 	}, nil
 }

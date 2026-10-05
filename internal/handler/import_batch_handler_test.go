@@ -18,7 +18,8 @@ import (
 
 func setupTestRouterWithImportBatch() http.Handler {
 	userRepo := repository.NewUserRepository(nil)
-	authService := service.NewAuthService(userRepo)
+	tokenRepo := repository.NewRefreshTokenRepository(nil)
+	authService := service.NewAuthService(userRepo, tokenRepo, "test-secret", 15*time.Minute, 7*24*time.Hour)
 	authHandler := NewAuthHandler(authService)
 
 	importRepo := repository.NewImportBatchRepository(nil)

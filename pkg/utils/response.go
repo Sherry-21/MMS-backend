@@ -14,13 +14,19 @@ func WriteJSON(w http.ResponseWriter, status int, payload interface{}) {
 	_ = json.NewEncoder(w).Encode(payload)
 }
 
-// WriteSuccess sends a standardized 200 OK or custom 2xx JSON response
+// WriteSuccess sends a standardized 200 OK or custom 2xx JSON response with default empty meta
 func WriteSuccess(w http.ResponseWriter, status int, message string, data interface{}) {
 	response := payloads.NewSuccessResponse(message, data)
 	WriteJSON(w, status, response)
 }
 
-// WriteError sends a standardized error JSON response
+// WritePaginatedSuccess sends a standardized 2xx JSON response with pagination metadata in meta and items in data
+func WritePaginatedSuccess(w http.ResponseWriter, status int, message string, meta interface{}, data interface{}) {
+	response := payloads.NewSuccessResponseWithMeta(message, meta, data)
+	WriteJSON(w, status, response)
+}
+
+// WriteError sends a standardized error JSON response with default empty meta
 func WriteError(w http.ResponseWriter, status int, message string, err interface{}) {
 	response := payloads.NewErrorResponse(message, err)
 	WriteJSON(w, status, response)

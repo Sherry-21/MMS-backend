@@ -11,15 +11,18 @@ import (
 
 	"maiora-backend-service/config"
 	_ "maiora-backend-service/docs"
+	appMiddleware "maiora-backend-service/internal/middleware"
 	"maiora-backend-service/pkg/utils"
 )
 
 // RouterConfig holds handler dependencies for router setup
 type RouterConfig struct {
 	AuthHandler        *AuthHandler
+	AuthMiddleware     *appMiddleware.AuthMiddleware
 	ImportBatchHandler *ImportBatchHandler
 	CategoryHandler    *CategoryHandler
 	ProductHandler     *ProductHandler
+	StockOpnameHandler *StockOpnameHandler
 	AppConfig          *config.Config
 }
 
@@ -29,7 +32,6 @@ func NewRouter(cfg *RouterConfig) *chi.Mux {
 
 	// Base Middlewares
 	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(60 * time.Second))
@@ -67,6 +69,15 @@ func NewRouter(cfg *RouterConfig) *chi.Mux {
 			api.Route("/auth", func(auth chi.Router) {
 				auth.Post("/register", cfg.AuthHandler.Register)
 				auth.Post("/login", cfg.AuthHandler.Login)
+				auth.Post("/refresh", cfg.AuthHandler.RefreshToken)
+
+				// Protected Auth Routes
+				if cfg.AuthMiddleware != nil {
+					auth.Group(func(protected chi.Router) {
+						protected.Use(cfg.AuthMiddleware.Authenticate)
+						protected.Get("/me", cfg.AuthHandler.GetMe)
+					})
+				}
 			})
 		}
 
@@ -95,6 +106,18 @@ func NewRouter(cfg *RouterConfig) *chi.Mux {
 		if cfg.ImportBatchHandler != nil {
 			api.Route("/import-batches", func(ib chi.Router) {
 				ib.Post("/", cfg.ImportBatchHandler.CreateImportBatch)
+			})
+		}
+
+		// Stock Opname & Cycle Count Routes
+		if cfg.StockOpnameHandler != nil {
+			api.Route("/stock-opnames", func(so chi.Router) {
+				so.Post("/generate-daily", cfg.StockOpnameHandler.GenerateDailyOpname)
+				so.Get("/today", cfg.StockOpnameHandler.GetTodayOpname)
+				so.Get("/", cfg.StockOpnameHandler.ListOpnames)
+				so.Get("/{id}", cfg.StockOpnameHandler.GetOpnameByID)
+				so.Post("/{id}/count", cfg.StockOpnameHandler.SubmitItemCounts)
+				so.Post("/{id}/complete", cfg.StockOpnameHandler.CompleteOpname)
 			})
 		}
 	})

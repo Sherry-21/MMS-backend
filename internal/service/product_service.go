@@ -6,19 +6,16 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/shopspring/decimal"
-
 	"maiora-backend-service/internal/model"
 	"maiora-backend-service/internal/payloads"
 	"maiora-backend-service/internal/repository"
 )
 
 var (
-	ErrProductNameRequired  = errors.New("product name is required")
-	ErrCategoryIDRequired   = errors.New("valid category_id is required")
-	ErrSKURequired          = errors.New("sku is required")
-	ErrVariantNameRequired  = errors.New("variant name is required")
-	ErrSellingPriceNegative = errors.New("default selling price cannot be negative")
+	ErrProductNameRequired = errors.New("product name is required")
+	ErrCategoryIDRequired  = errors.New("valid category_id is required")
+	ErrSKURequired         = errors.New("sku is required")
+	ErrVariantNameRequired = errors.New("variant name is required")
 )
 
 // ProductService defines business operations for products and variants
@@ -52,7 +49,7 @@ func (s *productService) CreateProduct(ctx context.Context, req *payloads.Create
 		return nil, ErrCategoryIDRequired
 	}
 
-	// Validate category existence
+	// Verify category exists
 	category, err := s.categoryRepo.FindByID(ctx, req.CategoryID)
 	if err != nil {
 		if errors.Is(err, repository.ErrCategoryNotFound) {
@@ -61,7 +58,6 @@ func (s *productService) CreateProduct(ctx context.Context, req *payloads.Create
 		return nil, fmt.Errorf("failed to verify category: %w", err)
 	}
 
-	// Validate variants & check SKU uniqueness
 	skuSet := make(map[string]bool)
 	variants := make([]model.ProductVariant, len(req.Variants))
 	for i, v := range req.Variants {
@@ -74,20 +70,15 @@ func (s *productService) CreateProduct(ctx context.Context, req *payloads.Create
 		}
 		skuSet[sku] = true
 
-		if v.DefaultSellingPrice.LessThan(decimal.Zero) {
-			return nil, ErrSellingPriceNegative
-		}
-
-		// Check if SKU already exists in DB
 		existing, err := s.productRepo.FindBySKU(ctx, sku)
 		if err == nil && existing != nil {
 			return nil, fmt.Errorf("SKU '%s' is already in use by another product variant", sku)
 		}
 
 		variants[i] = model.ProductVariant{
-			SKU:                 sku,
-			VariantName:         strings.TrimSpace(v.VariantName),
-			DefaultSellingPrice: v.DefaultSellingPrice,
+			SKU:         sku,
+			VariantName: strings.TrimSpace(v.VariantName),
+			ImageURL:    strings.TrimSpace(v.ImageURL),
 		}
 	}
 
@@ -101,16 +92,15 @@ func (s *productService) CreateProduct(ctx context.Context, req *payloads.Create
 		return nil, fmt.Errorf("failed to save product: %w", err)
 	}
 
-	// Map response
 	variantResponses := make([]payloads.ProductVariantResponse, len(product.Variants))
 	for i, v := range product.Variants {
 		variantResponses[i] = payloads.ProductVariantResponse{
-			ID:                  v.ID,
-			ProductID:           product.ID,
-			SKU:                 v.SKU,
-			VariantName:         v.VariantName,
-			DefaultSellingPrice: v.DefaultSellingPrice,
-			CreatedAt:           v.CreatedAt,
+			ID:          v.ID,
+			ProductID:   product.ID,
+			SKU:         v.SKU,
+			VariantName: v.VariantName,
+			ImageURL:    v.ImageURL,
+			CreatedAt:   v.CreatedAt,
 		}
 	}
 
@@ -148,9 +138,6 @@ func (s *productService) CreateVariant(ctx context.Context, productID int64, req
 	if strings.TrimSpace(req.VariantName) == "" {
 		return nil, ErrVariantNameRequired
 	}
-	if req.DefaultSellingPrice.LessThan(decimal.Zero) {
-		return nil, ErrSellingPriceNegative
-	}
 
 	// Check SKU uniqueness
 	existing, err := s.productRepo.FindBySKU(ctx, sku)
@@ -159,10 +146,10 @@ func (s *productService) CreateVariant(ctx context.Context, productID int64, req
 	}
 
 	variant := &model.ProductVariant{
-		ProductID:           productID,
-		SKU:                 sku,
-		VariantName:         req.VariantName,
-		DefaultSellingPrice: req.DefaultSellingPrice,
+		ProductID:   productID,
+		SKU:         sku,
+		VariantName: req.VariantName,
+		ImageURL:    strings.TrimSpace(req.ImageURL),
 	}
 
 	if err := s.productRepo.CreateVariant(ctx, variant); err != nil {
@@ -170,12 +157,12 @@ func (s *productService) CreateVariant(ctx context.Context, productID int64, req
 	}
 
 	return &payloads.ProductVariantResponse{
-		ID:                  variant.ID,
-		ProductID:           variant.ProductID,
-		SKU:                 variant.SKU,
-		VariantName:         variant.VariantName,
-		DefaultSellingPrice: variant.DefaultSellingPrice,
-		CreatedAt:           variant.CreatedAt,
+		ID:          variant.ID,
+		ProductID:   variant.ProductID,
+		SKU:         variant.SKU,
+		VariantName: variant.VariantName,
+		ImageURL:    variant.ImageURL,
+		CreatedAt:   variant.CreatedAt,
 	}, nil
 }
 
@@ -198,12 +185,12 @@ func (s *productService) GetProductByID(ctx context.Context, id int64) (*payload
 	variantResponses := make([]payloads.ProductVariantResponse, len(product.Variants))
 	for i, v := range product.Variants {
 		variantResponses[i] = payloads.ProductVariantResponse{
-			ID:                  v.ID,
-			ProductID:           v.ProductID,
-			SKU:                 v.SKU,
-			VariantName:         v.VariantName,
-			DefaultSellingPrice: v.DefaultSellingPrice,
-			CreatedAt:           v.CreatedAt,
+			ID:          v.ID,
+			ProductID:   v.ProductID,
+			SKU:         v.SKU,
+			VariantName: v.VariantName,
+			ImageURL:    v.ImageURL,
+			CreatedAt:   v.CreatedAt,
 		}
 	}
 
@@ -247,12 +234,12 @@ func (s *productService) ListProducts(ctx context.Context, search string, catego
 		variants := make([]payloads.ProductVariantResponse, len(p.Variants))
 		for j, v := range p.Variants {
 			variants[j] = payloads.ProductVariantResponse{
-				ID:                  v.ID,
-				ProductID:           v.ProductID,
-				SKU:                 v.SKU,
-				VariantName:         v.VariantName,
-				DefaultSellingPrice: v.DefaultSellingPrice,
-				CreatedAt:           v.CreatedAt,
+				ID:          v.ID,
+				ProductID:   v.ProductID,
+				SKU:         v.SKU,
+				VariantName: v.VariantName,
+				ImageURL:    v.ImageURL,
+				CreatedAt:   v.CreatedAt,
 			}
 		}
 
@@ -288,14 +275,14 @@ func (s *productService) ListVariants(ctx context.Context, search string) ([]pay
 		}
 
 		result[i] = payloads.ProductVariantListItemResponse{
-			ID:                  v.ID,
-			ProductID:           v.ProductID,
-			ProductName:         productName,
-			CategoryName:        categoryName,
-			SKU:                 v.SKU,
-			VariantName:         v.VariantName,
-			DefaultSellingPrice: v.DefaultSellingPrice,
-			CreatedAt:           v.CreatedAt,
+			ID:           v.ID,
+			ProductID:    v.ProductID,
+			ProductName:  productName,
+			CategoryName: categoryName,
+			SKU:          v.SKU,
+			VariantName:  v.VariantName,
+			ImageURL:     v.ImageURL,
+			CreatedAt:    v.CreatedAt,
 		}
 	}
 

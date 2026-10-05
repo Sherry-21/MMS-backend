@@ -16,8 +16,8 @@ func main() {
 	// 1. Load Configuration
 	cfg := config.Load()
 
-	// 2. Connect to MySQL
-	db, err := database.NewMySQLConnection(&cfg.Database, cfg.App.Env)
+	// 2. Connect to PostgreSQL / Neon DB
+	db, err := database.NewConnection(&cfg.Database, cfg.App.Env)
 	if err != nil {
 		log.Fatalf("❌ Database connection failed: %v\n", err)
 		os.Exit(1)

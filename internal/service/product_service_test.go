@@ -5,8 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/shopspring/decimal"
-
 	"maiora-backend-service/internal/model"
 	"maiora-backend-service/internal/payloads"
 	"maiora-backend-service/internal/repository"
@@ -131,14 +129,12 @@ func TestProductService_CreateProduct_Success(t *testing.T) {
 		Description: "Titanium design",
 		Variants: []payloads.CreateProductVariantRequest{
 			{
-				SKU:                 "IP15PRO-NAT-128",
-				VariantName:         "Natural Titanium 128GB",
-				DefaultSellingPrice: decimal.NewFromFloat(18999000),
+				SKU:         "IP15PRO-NAT-128",
+				VariantName: "Natural Titanium 128GB",
 			},
 			{
-				SKU:                 "IP15PRO-BLK-256",
-				VariantName:         "Black Titanium 256GB",
-				DefaultSellingPrice: decimal.NewFromFloat(21999000),
+				SKU:         "IP15PRO-BLK-256",
+				VariantName: "Black Titanium 256GB",
 			},
 		},
 	}
@@ -167,8 +163,8 @@ func TestProductService_CreateProduct_DuplicateSKU(t *testing.T) {
 		CategoryID: 1,
 		Name:       "iPhone 15",
 		Variants: []payloads.CreateProductVariantRequest{
-			{SKU: "SAME-SKU", VariantName: "V1", DefaultSellingPrice: decimal.NewFromFloat(1000)},
-			{SKU: "SAME-SKU", VariantName: "V2", DefaultSellingPrice: decimal.NewFromFloat(2000)},
+			{SKU: "SAME-SKU", VariantName: "V1"},
+			{SKU: "SAME-SKU", VariantName: "V2"},
 		},
 	}
 

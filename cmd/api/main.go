@@ -12,6 +12,7 @@ import (
 
 	"maiora-backend-service/config"
 	"maiora-backend-service/internal/handler"
+	"maiora-backend-service/internal/middleware"
 	"maiora-backend-service/internal/repository"
 	"maiora-backend-service/internal/service"
 	"maiora-backend-service/pkg/database"
@@ -32,42 +33,60 @@ import (
 // @BasePath /
 // @schemes http https
 
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and JWT token.
+
 func main() {
 	// 1. Load Application Configuration
 	cfg := config.Load()
 	log.Printf("Starting %s in %s mode...\n", cfg.App.Name, cfg.App.Env)
 
-	// 2. Initialize Database Connection (GORM + MySQL)
-	db, err := database.NewMySQLConnection(&cfg.Database, cfg.App.Env)
+	// 2. Initialize Database Connection (GORM + PostgreSQL / Neon DB)
+	db, err := database.NewConnection(&cfg.Database, cfg.App.Env)
 	if err != nil {
-		log.Printf("Warning: Failed to connect to MySQL database: %v\n", err)
+		log.Printf("Warning: Failed to connect to PostgreSQL database: %v\n", err)
 		log.Println("Server running in offline/fallback mode (mock repository will be used).")
 	}
 
 	// 3. Initialize Repositories (Data Access Layer)
 	userRepo := repository.NewUserRepository(db)
+	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
 	categoryRepo := repository.NewCategoryRepository(db)
 	productRepo := repository.NewProductRepository(db)
 	importBatchRepo := repository.NewImportBatchRepository(db)
+	stockOpnameRepo := repository.NewStockOpnameRepository(db)
 
 	// 4. Initialize Services (Business Logic Layer)
-	authService := service.NewAuthService(userRepo)
+	authService := service.NewAuthService(
+		userRepo,
+		refreshTokenRepo,
+		cfg.JWT.Secret,
+		time.Duration(cfg.JWT.AccessExpirationMinutes)*time.Minute,
+		time.Duration(cfg.JWT.RefreshExpirationDays)*24*time.Hour,
+	)
 	categoryService := service.NewCategoryService(categoryRepo)
 	productService := service.NewProductService(productRepo, categoryRepo)
 	importBatchService := service.NewImportBatchService(importBatchRepo)
+	stockOpnameService := service.NewStockOpnameService(stockOpnameRepo)
 
-	// 5. Initialize Handlers (Transport Layer)
+	// 5. Initialize Handlers and Middlewares (Transport Layer)
+	authMiddleware := middleware.NewAuthMiddleware(cfg.JWT.Secret, userRepo)
 	authHandler := handler.NewAuthHandler(authService)
 	categoryHandler := handler.NewCategoryHandler(categoryService)
 	productHandler := handler.NewProductHandler(productService)
 	importBatchHandler := handler.NewImportBatchHandler(importBatchService)
+	stockOpnameHandler := handler.NewStockOpnameHandler(stockOpnameService)
 
 	// 6. Initialize Chi Router
 	router := handler.NewRouter(&handler.RouterConfig{
 		AuthHandler:        authHandler,
+		AuthMiddleware:     authMiddleware,
 		CategoryHandler:    categoryHandler,
 		ProductHandler:     productHandler,
 		ImportBatchHandler: importBatchHandler,
+		StockOpnameHandler: stockOpnameHandler,
 		AppConfig:          cfg,
 	})
 

@@ -6,10 +6,9 @@ definitions:
       error: {}
       message:
         type: string
+      meta: {}
       success:
         type: boolean
-      timestamp:
-        type: string
     type: object
   payloads.CategoryResponse:
     properties:
@@ -21,6 +20,27 @@ definitions:
         type: string
       slug:
         type: string
+    type: object
+  payloads.CompleteStockOpnameRequest:
+    properties:
+      conducted_by:
+        example: Staff John
+        type: string
+      notes:
+        example: Cycle count completed and verified
+        type: string
+    type: object
+  payloads.CountItemInput:
+    properties:
+      item_id:
+        example: 1
+        type: integer
+      notes:
+        example: 2 units missing / damaged
+        type: string
+      physical_quantity:
+        example: 48
+        type: integer
     type: object
   payloads.CreateCategoryRequest:
     properties:
@@ -83,15 +103,24 @@ definitions:
     type: object
   payloads.CreateProductVariantRequest:
     properties:
-      default_selling_price:
-        example: 14999000
-        type: number
+      image_url:
+        example: https://images.unsplash.com/photo-1510557880182-3d4d3cba35a5
+        type: string
       sku:
         example: IPHONE15-BLK-128
         type: string
       variant_name:
         example: Black 128GB
         type: string
+    type: object
+  payloads.GenerateStockOpnameRequest:
+    properties:
+      notes:
+        example: Morning daily random cycle count
+        type: string
+      sample_size:
+        example: 5
+        type: integer
     type: object
   payloads.ImportBatchItemResponse:
     properties:
@@ -140,10 +169,31 @@ definitions:
     type: object
   payloads.LoginResponse:
     properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
       message:
+        type: string
+      refresh_token:
+        type: string
+      token:
+        type: string
+      token_type:
         type: string
       user:
         $ref: '#/definitions/payloads.UserResponse'
+    type: object
+  payloads.PaginationMeta:
+    properties:
+      limit:
+        type: integer
+      page:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
     type: object
   payloads.ProductResponse:
     properties:
@@ -170,10 +220,10 @@ definitions:
         type: string
       created_at:
         type: string
-      default_selling_price:
-        type: number
       id:
         type: integer
+      image_url:
+        type: string
       product_id:
         type: integer
       product_name:
@@ -187,15 +237,21 @@ definitions:
     properties:
       created_at:
         type: string
-      default_selling_price:
-        type: number
       id:
         type: integer
+      image_url:
+        type: string
       product_id:
         type: integer
       sku:
         type: string
       variant_name:
+        type: string
+    type: object
+  payloads.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
         type: string
     type: object
   payloads.RegisterRequest:
@@ -205,6 +261,113 @@ definitions:
         type: string
       username:
         example: john_doe
+        type: string
+    type: object
+  payloads.StockOpnameDetailResponse:
+    properties:
+      assigned_by:
+        type: string
+      completed_at:
+        type: string
+      conducted_by:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/payloads.StockOpnameItemResponse'
+        type: array
+      notes:
+        type: string
+      opname_date:
+        type: string
+      opname_number:
+        type: string
+      status:
+        type: string
+      total_discrepancy:
+        type: integer
+      total_items:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  payloads.StockOpnameItemResponse:
+    properties:
+      created_at:
+        type: string
+      discrepancy:
+        type: integer
+      id:
+        type: integer
+      image_url:
+        type: string
+      notes:
+        type: string
+      physical_quantity:
+        type: integer
+      product_name:
+        type: string
+      product_variant_id:
+        type: integer
+      sku:
+        type: string
+      status:
+        type: string
+      stock_opname_id:
+        type: integer
+      system_quantity:
+        type: integer
+      updated_at:
+        type: string
+      variant_name:
+        type: string
+    type: object
+  payloads.StockOpnameResponse:
+    properties:
+      assigned_by:
+        type: string
+      completed_at:
+        type: string
+      conducted_by:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      notes:
+        type: string
+      opname_date:
+        type: string
+      opname_number:
+        type: string
+      status:
+        type: string
+      total_discrepancy:
+        type: integer
+      total_items:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  payloads.SubmitStockOpnameCountRequest:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/payloads.CountItemInput'
+        type: array
+    type: object
+  payloads.TokenResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      refresh_token:
+        type: string
+      token_type:
         type: string
     type: object
   payloads.UserResponse:
@@ -269,6 +432,71 @@ paths:
           schema:
             $ref: '#/definitions/payloads.BaseResponse'
       summary: User login
+      tags:
+      - Authentication
+  /api/v1/auth/me:
+    get:
+      description: Retrieves the profile information of the currently authenticated
+        user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Authenticated user details
+          schema:
+            allOf:
+            - $ref: '#/definitions/payloads.BaseResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/payloads.UserResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+      security:
+      - BearerAuth: []
+      summary: Get current authenticated user profile
+      tags:
+      - Authentication
+  /api/v1/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Exchanges a valid refresh token for a newly rotated access token
+        and refresh token pair
+      parameters:
+      - description: Refresh Token Payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/payloads.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Token refreshed successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/payloads.BaseResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/payloads.TokenResponse'
+              type: object
+        "400":
+          description: Missing or invalid payload
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "401":
+          description: Invalid or expired refresh token
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+      summary: Refresh access token
       tags:
       - Authentication
   /api/v1/auth/register:
@@ -472,6 +700,8 @@ paths:
                   items:
                     $ref: '#/definitions/payloads.ProductResponse'
                   type: array
+                meta:
+                  $ref: '#/definitions/payloads.PaginationMeta'
               type: object
         "500":
           description: Internal Server Error
@@ -598,7 +828,261 @@ paths:
       summary: Add a variant to a product
       tags:
       - Products
+  /api/v1/stock-opnames:
+    get:
+      description: Retrieves paginated history of all stock opname audits with optional
+        status and date filters
+      parameters:
+      - default: 1
+        description: Page number (default 1)
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Items per page (default 20)
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by status (PENDING, IN_PROGRESS, COMPLETED, CANCELLED)
+        in: query
+        name: status
+        type: string
+      - description: Start date filter (YYYY-MM-DD)
+        in: query
+        name: from_date
+        type: string
+      - description: End date filter (YYYY-MM-DD)
+        in: query
+        name: to_date
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Stock opnames history
+          schema:
+            allOf:
+            - $ref: '#/definitions/payloads.BaseResponse'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/payloads.StockOpnameResponse'
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+      summary: List stock opname record history
+      tags:
+      - Stock Opname
+  /api/v1/stock-opnames/{id}:
+    get:
+      description: Retrieves detailed information and all audited line items of a
+        stock opname session
+      parameters:
+      - description: Stock Opname ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Stock opname details
+          schema:
+            allOf:
+            - $ref: '#/definitions/payloads.BaseResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/payloads.StockOpnameDetailResponse'
+              type: object
+        "400":
+          description: Invalid ID
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "404":
+          description: Stock opname not found
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+      summary: Get stock opname session by ID
+      tags:
+      - Stock Opname
+  /api/v1/stock-opnames/{id}/complete:
+    post:
+      consumes:
+      - application/json
+      description: Marks stock opname session as COMPLETED, calculates total discrepancy,
+        and records completion timestamp
+      parameters:
+      - description: Stock Opname ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Completion details
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/payloads.CompleteStockOpnameRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Stock opname completed successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/payloads.BaseResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/payloads.StockOpnameDetailResponse'
+              type: object
+        "400":
+          description: Invalid ID
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "404":
+          description: Stock opname not found
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "409":
+          description: Stock opname already completed
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+      summary: Finalize and complete stock opname session
+      tags:
+      - Stock Opname
+  /api/v1/stock-opnames/{id}/count:
+    post:
+      consumes:
+      - application/json
+      description: Records physical inventory counts for items in an active stock
+        opname session and calculates discrepancies
+      parameters:
+      - description: Stock Opname ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Audited item counts
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/payloads.SubmitStockOpnameCountRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Counts recorded successfully
+          schema:
+            allOf:
+            - $ref: '#/definitions/payloads.BaseResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/payloads.StockOpnameDetailResponse'
+              type: object
+        "400":
+          description: Invalid payload or parameters
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "404":
+          description: Stock opname or item not found
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "409":
+          description: Stock opname already completed
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+      summary: Submit physical counts for stock opname items
+      tags:
+      - Stock Opname
+  /api/v1/stock-opnames/generate-daily:
+    post:
+      consumes:
+      - application/json
+      description: Randomly samples product variants from inventory and generates
+        a stock opname audit session for today
+      parameters:
+      - description: Opname generation options
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/payloads.GenerateStockOpnameRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Stock opname generated or active retrieved
+          schema:
+            allOf:
+            - $ref: '#/definitions/payloads.BaseResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/payloads.StockOpnameDetailResponse'
+              type: object
+        "400":
+          description: Invalid request payload
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "404":
+          description: No product variants available
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+      summary: Generate daily random cycle count assignment
+      tags:
+      - Stock Opname
+  /api/v1/stock-opnames/today:
+    get:
+      description: Retrieves the active stock opname cycle count session scheduled
+        for today
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Today's active stock opname
+          schema:
+            allOf:
+            - $ref: '#/definitions/payloads.BaseResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/payloads.StockOpnameDetailResponse'
+              type: object
+        "404":
+          description: No active stock opname found for today
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/payloads.BaseResponse'
+      summary: Get today's active stock opname assignment
+      tags:
+      - Stock Opname
 schemes:
 - http
 - https
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

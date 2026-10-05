@@ -1,0 +1,70 @@
+services:
+  # Database Auto-Migration Service (Runs once on start against Neon DB)
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: maiora_migrate
+    entrypoint: ["migrate"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_NAME: "Maiora System Backend"
+      APP_ENV: "production"
+      DATABASE_URL: ${DATABASE_URL:-}
+      DB_HOST: ${DB_HOST:-}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-}
+      DB_NAME: ${DB_NAME:-neondb}
+      DB_SSLMODE: ${DB_SSLMODE:-require}
+    restart: "no"
+    networks:
+      - maiora_net
+
+  # MMS Backend API Service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: maiora_api
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_NAME: "Maiora System Backend"
+      APP_ENV: "production"
+      PORT: "8080"
+      READ_TIMEOUT: "15s"
+      WRITE_TIMEOUT: "15s"
+      IDLE_TIMEOUT: "60s"
+      DATABASE_URL: ${DATABASE_URL:-}
+      DB_HOST: ${DB_HOST:-}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-}
+      DB_NAME: ${DB_NAME:-neondb}
+      DB_SSLMODE: ${DB_SSLMODE:-require}
+      DB_MAX_OPEN_CONNS: ${DB_MAX_OPEN_CONNS:-25}
+      DB_MAX_IDLE_CONNS: ${DB_MAX_IDLE_CONNS:-10}
+      DB_CONN_MAX_LIFETIME: ${DB_CONN_MAX_LIFETIME:-5m}
+      ALLOWED_ORIGINS: "*"
+      ALLOWED_METHODS: "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+      ALLOWED_HEADERS: "Accept,Authorization,Content-Type,X-CSRF-Token"
+      ALLOW_CREDENTIALS: "true"
+      JWT_SECRET: ${JWT_SECRET:-${SECRET_KEY:-maiora-super-secret-jwt-key-change-in-production}}
+      JWT_ACCESS_EXPIRATION_MINUTES: "15"
+      JWT_REFRESH_EXPIRATION_DAYS: "7"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - maiora_net
+
+networks:
+  maiora_net:
+    driver: bridge

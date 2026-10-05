@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 
-	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
@@ -12,16 +12,26 @@ import (
 	"maiora-backend-service/internal/model"
 )
 
-// NewMySQLConnection establishes a GORM connection to the MySQL database
-func NewMySQLConnection(cfg *config.DatabaseConfig, appEnv string) (*gorm.DB, error) {
-	dsn := fmt.Sprintf(
-		"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-		cfg.User,
-		cfg.Password,
-		cfg.Host,
-		cfg.Port,
-		cfg.Name,
-	)
+// NewConnection establishes a GORM connection to PostgreSQL (Neon DB compatible)
+func NewConnection(cfg *config.DatabaseConfig, appEnv string) (*gorm.DB, error) {
+	var dsn string
+	if cfg.URL != "" {
+		dsn = cfg.URL
+	} else {
+		sslMode := cfg.SSLMode
+		if sslMode == "" {
+			sslMode = "require"
+		}
+		dsn = fmt.Sprintf(
+			"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=UTC",
+			cfg.Host,
+			cfg.User,
+			cfg.Password,
+			cfg.Name,
+			cfg.Port,
+			sslMode,
+		)
+	}
 
 	// Configure GORM logger level based on environment
 	logLevel := logger.Warn
@@ -33,9 +43,9 @@ func NewMySQLConnection(cfg *config.DatabaseConfig, appEnv string) (*gorm.DB, er
 		Logger: logger.Default.LogMode(logLevel),
 	}
 
-	db, err := gorm.Open(mysql.Open(dsn), gormConfig)
+	db, err := gorm.Open(postgres.Open(dsn), gormConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open MySQL connection: %w", err)
+		return nil, fmt.Errorf("failed to open PostgreSQL connection: %w", err)
 	}
 
 	// Configure connection pooling via underlying sql.DB
@@ -50,11 +60,21 @@ func NewMySQLConnection(cfg *config.DatabaseConfig, appEnv string) (*gorm.DB, er
 
 	// Verify connection with Ping
 	if err := sqlDB.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping MySQL database: %w", err)
+		return nil, fmt.Errorf("failed to ping PostgreSQL database: %w", err)
 	}
 
-	log.Printf("Successfully connected to MySQL database: %s@%s:%s/%s\n", cfg.User, cfg.Host, cfg.Port, cfg.Name)
+	log.Println("Successfully connected to PostgreSQL (Neon DB) database")
 	return db, nil
+}
+
+// NewPostgresConnection is an alias for NewConnection
+func NewPostgresConnection(cfg *config.DatabaseConfig, appEnv string) (*gorm.DB, error) {
+	return NewConnection(cfg, appEnv)
+}
+
+// NewMySQLConnection is retained for backwards compatibility and forwards to NewConnection
+func NewMySQLConnection(cfg *config.DatabaseConfig, appEnv string) (*gorm.DB, error) {
+	return NewConnection(cfg, appEnv)
 }
 
 // AutoMigrate runs GORM schema migrations for all application entities
@@ -70,6 +90,9 @@ func AutoMigrate(db *gorm.DB) error {
 		&model.ImportBatch{},
 		&model.ImportBatchItem{},
 		&model.InventoryBatch{},
+		&model.StockOpname{},
+		&model.StockOpnameItem{},
+		&model.RefreshToken{},
 	); err != nil {
 		return fmt.Errorf("auto-migration failed: %w", err)
 	}

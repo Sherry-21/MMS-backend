@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"maiora-backend-service/config"
 	"maiora-backend-service/internal/payloads"
@@ -15,7 +16,8 @@ import (
 
 func setupTestRouter() http.Handler {
 	userRepo := repository.NewUserRepository(nil)
-	authService := service.NewAuthService(userRepo)
+	tokenRepo := repository.NewRefreshTokenRepository(nil)
+	authService := service.NewAuthService(userRepo, tokenRepo, "test-secret", 15*time.Minute, 7*24*time.Hour)
 	authHandler := NewAuthHandler(authService)
 
 	cfg := &config.Config{
@@ -54,6 +56,21 @@ func TestAuthHandler_Register_Validation(t *testing.T) {
 			Password: "123", // too short
 		})
 		req, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/register", bytes.NewBuffer(body))
+		req.Header.Set("Content-Type", "application/json")
+		rec := httptest.NewRecorder()
+
+		router.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("expected status 400, got %d", rec.Code)
+		}
+	})
+
+	t.Run("POST /api/v1/auth/refresh empty token returns 400", func(t *testing.T) {
+		body, _ := json.Marshal(payloads.RefreshTokenRequest{
+			RefreshToken: "",
+		})
+		req, _ := http.NewRequest(http.MethodPost, "/api/v1/auth/refresh", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
 
